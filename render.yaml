@@ -1,8 +1,11 @@
-services:
-  - type: web
-    name: live-academic-portal
-    env: node
-    plan: free
-    region: ohio
-    buildCommand: npm install
-    startCommand: npm start
+{
+  "name": "live-academic-portal",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
