@@ -6,10 +6,62 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const app = express();
 app.use(cors());
 
-app.get('/', (req, res) => {
+// 1. FRONT-END DISGUISE GATE: Handles your educational portal interface
+app.get('/', async (req, res) => {
     const activeAssignment = req.query.assignment || '';
     const activeSearch = req.query.q || '';
 
+    // CRITICAL FIX: If a search payload exists, fetch and write the site directly to the body memory layer (No Iframe)
+    if (activeSearch) {
+        let targetUrl = decodeURIComponent(activeSearch);
+        try {
+            const urlObj = new URL(targetUrl);
+            const options = {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Referer': urlObj.origin
+                }
+            };
+
+            const response = await fetch(targetUrl, options);
+            let htmlContent = await response.text();
+
+            // SCRIPT SANDBOX TRICK: Injects a base tag so asset paths look back to Google, but overrides tab-hijacking functions
+            const securityOverrideScript = `<head><base href="${urlObj.origin}/"><script>
+                (function() {
+                    // Force-freeze the window navigation object to paralyze Google's frame-busting loops
+                    Object.defineProperty(window, 'top', { value: window, configurable: false, writable: false });
+                    Object.defineProperty(window, 'parent', { value: window, configurable: false, writable: false });
+                    
+                    // Intercept any deep asset form clicks to keep operations bound inside the active tab lane
+                    window.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        const form = e.target;
+                        if (form.action) {
+                            window.location.href = window.location.origin + window.location.pathname + '?assignment=${activeAssignment}&q=' + encodeURIComponent(form.action);
+                        }
+                    }, true);
+                })();
+            <\/script>`;
+            
+            htmlContent = htmlContent.replace(/<head>/i, securityOverrideScript);
+
+            // Strip the explicit security blocks on the server container before passing data back
+            htmlContent = htmlContent.replace(/content-security-policy/gi, 'disabled-csp');
+            htmlContent = htmlContent.replace(/x-frame-options/gi, 'disabled-xfo');
+
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            return res.send(htmlContent);
+
+        } catch (err) {
+            return res.status(500).send(`<h3>Proxy Server Pipeline Timeout:</h3><p>${err.message}</p>`);
+        }
+    }
+
+    // DEFAULT INTERFACE LAYOUT: Serves the clean student dashboard portal when not searching
     let bannerStyle = "display: none;";
     let bannerText = "";
     let headerText = "General Database Search Gateway";
@@ -45,15 +97,9 @@ app.get('/', (req, res) => {
                 .action-btn { display: block; padding: 14px 24px; font-size: 15px; background: #0070f3; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; box-sizing: border-box; text-align: center; }
                 .bot-btn { background: #1e293b; margin-top: 10px; }
                 #result-link { margin-top: 25px; padding: 15px; background: #f0f7ff; border: 1px solid #bae7ff; border-radius: 8px; display: none; word-break: break-all; font-size: 14px; }
-                .view-panel { display: ${activeSearch ? 'block' : 'none'}; width: 100%; height: 100%; border: none; box-sizing: border-box; position: fixed; top: 0; left: 0; z-index: 1000; background: #fff; }
-                iframe { width: 100%; height: 100%; border: none; margin: 0; padding: 0; }
             </style>
         </head>
         <body>
-            <div id="viewPanel" class="view-panel">
-                <!-- CRITICAL PATCH: Added strict sandbox configurations. Restricts forms and same-origin scripts from altering top-frame window navigation elements -->
-                <iframe src="/service?url=${encodeURIComponent(activeSearch)}" sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts"></iframe>
-            </div>
             <div id="mainUI" class="app-container">
                 <div class="sidebar">
                     <div class="school-logo">CampusWorkspace</div>
@@ -68,7 +114,7 @@ app.get('/', (req, res) => {
                     </div>
                     <div class="tool-box">
                         <h3>External Research Engine Tunnel</h3>
-                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Type any URL or streaming media site below to compile an unblocked proxy pipeline inside this viewport layout.</p>
+                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Type any URL or website destination below to launch an unblocked proxy mirror inside this tab container workspace.</p>
                         <input type="text" id="urlInput" placeholder="Enter target site here (e.g., google.com, dulo.tv)..." autocomplete="off">
                         <button class="action-btn" id="searchBtn">Execute Research Pipeline</button>
                     </div>
@@ -106,57 +152,6 @@ app.get('/', (req, res) => {
     `);
 });
 
-app.get('/service', async (req, res) => {
-    let targetUrl = req.query.url;
-    if (!targetUrl) return res.status(400).send("No target site URL specified.");
-
-    try {
-        const urlObj = new URL(targetUrl);
-        const options = {
-            method: 'GET',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Origin': urlObj.origin,
-                'Referer': urlObj.origin
-            }
-        };
-
-        const response = await fetch(targetUrl, options);
-        let contentType = response.headers.get('content-type') || '';
-        
-        if (!contentType.includes('text/html')) {
-            const dataBuffer = await response.buffer();
-            res.setHeader('Content-Type', contentType);
-            return res.send(dataBuffer);
-        }
-
-        let htmlContent = await response.text();
-        const injectionBase = `<head><base href="${urlObj.origin}/"><script>
-            (function() {
-                const originFetch = window.fetch;
-                window.fetch = function(url, options) {
-                    if (url && !url.toString().startsWith('http') && !url.toString().startsWith('/')) {
-                        url = "${urlObj.origin}/" + url;
-                    }
-                    return originFetch(url, options);
-                };
-            })();
-        </script>`;
-        
-        htmlContent = htmlContent.replace(/<head>/i, injectionBase);
-        htmlContent = htmlContent.replace(/content-security-policy/gi, 'disabled-csp');
-        htmlContent = htmlContent.replace(/x-frame-options/gi, 'disabled-xfo');
-
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-        res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
-        res.send(htmlContent);
-    } catch (err) {
-        res.status(500).send(`<h3>Streaming Proxy Server Error:</h3><p>${err.message}</p>`);
-    }
-});
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Streaming Proxy operating live on port ${PORT}`));
+app.listen(PORT, () => console.log(`Unrestricted Server Stream operating live on port ${PORT}`));
+
