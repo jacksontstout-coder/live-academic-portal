@@ -1,14 +1,15 @@
 const express = require('express');
-const http = require('http');
 const cors = require('cors');
 
-const app = express();
-const server = http.createServer(app);
+// Dynamically import node-fetch to match standard cloud environment specs
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-// Allow unrestricted data streaming across our cloud proxy lanes
+const app = express();
 app.use(cors());
 
-// Serve the master interactive search interface on the home path
+const modules = ['algebra-workbook', 'geometry-proofs', 'calculus-limits', 'history-archive', 'literature-notes', 'chemistry-lab'];
+
+// 1. FRONT-END ROUTE: Serves the authentic Student Canvas/Workspace interface
 app.get('/', (req, res) => {
     const activeAssignment = req.query.assignment || '';
     const activeSearch = req.query.q || '';
@@ -53,9 +54,9 @@ app.get('/', (req, res) => {
             </style>
         </head>
         <body>
-            <!-- Dynamic Web Proxy Frame Layer -->
+            <!-- Unblocked Dynamic Web Proxy Frame Layer -->
             <div id="viewPanel" class="view-panel">
-                <iframe src="/service/${encodeURIComponent(activeSearch)}"></iframe>
+                <iframe src="/service?url=${encodeURIComponent(activeSearch)}"></iframe>
             </div>
 
             <div id="mainUI" class="app-container">
@@ -78,6 +79,7 @@ app.get('/', (req, res) => {
                     </div>
                     <div class="tool-box">
                         <h3>Proxy Dispenser Bot</h3>
+                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Click below to have the bot dynamically request and allocate a completely new educational workspace tracking path parameter configuration.</p>
                         <button class="action-btn bot-btn" id="cloneBtn">Replicate Workspace Node</button>
                         <div id="result-link"></div>
                     </div>
@@ -88,7 +90,6 @@ app.get('/', (req, res) => {
                     let target = document.getElementById('urlInput').value.trim();
                     if (!target) return;
                     
-                    // Formulate standard search indexing paths for plain text keywords vs domains
                     if (!target.includes('.')) {
                         target = 'https://google.com' + encodeURIComponent(target);
                     } else if (!/^https?:\\/\\//i.test(target)) {
@@ -114,15 +115,14 @@ app.get('/', (req, res) => {
     `);
 });
 
-// TRUE BACKEND RE-ROUTING GATEWAY (Intercerts and streams the ENTIRE live internet natively)
-app.get('/service/:url', async (req, res) => {
-    let targetUrl = decodeURIComponent(req.params.url);
+// 2. TRUE BACKEND ROUTING GATEWAY: Intercepts, strips headers, and streams the entire internet live
+app.get('/service', async (req, res) => {
+    let targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send("No target site URL specified.");
 
     try {
         const urlObj = new URL(targetUrl);
         
-        // Formulate standard headers array to spoof target site filters
         const options = {
             method: 'GET',
             headers: {
@@ -132,15 +132,14 @@ app.get('/service/:url', async (req, res) => {
             }
         };
 
-        // Fetch the raw internet asset data directly on the server-side to neutralize client-side firewalls
         const response = await fetch(targetUrl, options);
         let htmlContent = await response.text();
 
-        // DEFEAT SAME-ORIGIN SECURITY: Inject an internal base path tag so the site fetches assets from itself
+        // DEFEAT SAME-ORIGIN SECURITY: Inject an internal base path tag so relative styling/scripts resolve cleanly
         const injectionBase = `<head><base href="${urlObj.origin}/">`;
         htmlContent = htmlContent.replace(/<head>/i, injectionBase);
 
-        // Strip content validation script tags that cause layout breaking or tracking
+        // Strip content evaluation security rules that freeze iframes or block rendering
         htmlContent = htmlContent.replace(/content-security-policy/gi, 'disabled-csp');
 
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
