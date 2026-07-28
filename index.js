@@ -1,18 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 
-// Dynamically import node-fetch to match standard cloud environment specs
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
 app.use(cors());
 
-const modules = ['algebra-workbook', 'geometry-proofs', 'calculus-limits', 'history-archive', 'literature-notes', 'chemistry-lab'];
-
-// 1. FRONT-END ROUTE: Serves the authentic Student Canvas/Workspace interface
 app.get('/', (req, res) => {
     const activeAssignment = req.query.assignment || '';
-    const activeSearch = req.query.q || '';
 
     let bannerStyle = "display: none;";
     let bannerText = "";
@@ -49,14 +44,14 @@ app.get('/', (req, res) => {
                 .action-btn { display: block; padding: 14px 24px; font-size: 15px; background: #0070f3; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; box-sizing: border-box; text-align: center; }
                 .bot-btn { background: #1e293b; margin-top: 10px; }
                 #result-link { margin-top: 25px; padding: 15px; background: #f0f7ff; border: 1px solid #bae7ff; border-radius: 8px; display: none; word-break: break-all; font-size: 14px; }
-                .view-panel { display: ${activeSearch ? 'block' : 'none'}; width: 100%; height: 100%; border: none; box-sizing: border-box; position: fixed; top: 0; left: 0; z-index: 1000; background: #fff; }
+                .view-panel { display: none; width: 100%; height: 100%; border: none; box-sizing: border-box; position: fixed; top: 0; left: 0; z-index: 1000; background: #fff; }
                 iframe { width: 100%; height: 100%; border: none; margin: 0; padding: 0; }
             </style>
         </head>
         <body>
-            <!-- Unblocked Dynamic Web Proxy Frame Layer -->
+            <!-- Dynamic Hidden Web Proxy Frame Layer -->
             <div id="viewPanel" class="view-panel">
-                <iframe src="/service?url=${encodeURIComponent(activeSearch)}"></iframe>
+                <iframe id="proxyIframe" src=""></iframe>
             </div>
 
             <div id="mainUI" class="app-container">
@@ -73,13 +68,12 @@ app.get('/', (req, res) => {
                     </div>
                     <div class="tool-box">
                         <h3>External Research Engine Tunnel</h3>
-                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Type any URL or website destination below to launch an unblocked proxy mirror inside this tab container workspace.</p>
-                        <input type="text" id="urlInput" placeholder="Enter any site URL here (e.g., wikipedia.org, google.com)..." autocomplete="off">
+                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Type any URL or streaming media site below to compile an unblocked proxy pipeline inside this viewport layout.</p>
+                        <input type="text" id="urlInput" placeholder="Enter target site here (e.g., dulo.tv, google.com)..." autocomplete="off">
                         <button class="action-btn" id="searchBtn">Execute Research Pipeline</button>
                     </div>
                     <div class="tool-box">
                         <h3>Proxy Dispenser Bot</h3>
-                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Click below to have the bot dynamically request and allocate a completely new educational workspace tracking path parameter configuration.</p>
                         <button class="action-btn bot-btn" id="cloneBtn">Replicate Workspace Node</button>
                         <div id="result-link"></div>
                     </div>
@@ -96,9 +90,9 @@ app.get('/', (req, res) => {
                         target = 'https://' + target;
                     }
 
-                    const subs = ['algebra-workbook', 'geometry-proofs', 'calculus-limits', 'history-archive'];
-                    const randomSubject = subs[Math.floor(Math.random() * subs.length)] + '-' + Math.floor(1000 + Math.random() * 9999);
-                    window.location.href = '/?assignment=' + randomSubject + '&q=' + encodeURIComponent(target);
+                    // FIXED: Loads the frame invisibly over the page. The browser URL stays completely frozen.
+                    document.getElementById('viewPanel').style.display = 'block';
+                    document.getElementById('proxyIframe').src = '/service?url=' + encodeURIComponent(target);
                 };
 
                 document.getElementById('cloneBtn').onclick = function() {
@@ -115,40 +109,55 @@ app.get('/', (req, res) => {
     `);
 });
 
-// 2. TRUE BACKEND ROUTING GATEWAY: Intercepts, strips headers, and streams the entire internet live
 app.get('/service', async (req, res) => {
     let targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send("No target site URL specified.");
 
     try {
         const urlObj = new URL(targetUrl);
-        
         const options = {
             method: 'GET',
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5'
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Origin': urlObj.origin,
+                'Referer': urlObj.origin
             }
         };
 
         const response = await fetch(targetUrl, options);
+        let contentType = response.headers.get('content-type') || '';
+        
+        if (!contentType.includes('text/html')) {
+            const dataBuffer = await response.buffer();
+            res.setHeader('Content-Type', contentType);
+            return res.send(dataBuffer);
+        }
+
         let htmlContent = await response.text();
-
-        // DEFEAT SAME-ORIGIN SECURITY: Inject an internal base path tag so relative styling/scripts resolve cleanly
-        const injectionBase = `<head><base href="${urlObj.origin}/">`;
+        const injectionBase = `<head><base href="${urlObj.origin}/"><script>
+            (function() {
+                const originFetch = window.fetch;
+                window.fetch = function(url, options) {
+                    if (url && !url.toString().startsWith('http') && !url.toString().startsWith('/')) {
+                        url = "${urlObj.origin}/" + url;
+                    }
+                    return originFetch(url, options);
+                };
+            })();
+        </script>`;
+        
         htmlContent = htmlContent.replace(/<head>/i, injectionBase);
-
-        // Strip content evaluation security rules that freeze iframes or block rendering
         htmlContent = htmlContent.replace(/content-security-policy/gi, 'disabled-csp');
+        htmlContent = htmlContent.replace(/x-frame-options/gi, 'disabled-xfo');
 
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.send(htmlContent);
-
     } catch (err) {
-        res.status(500).send(`<h3>Proxy Server Connection Timeout:</h3><p>${err.message}</p>`);
+        res.status(500).send(`<h3>Streaming Proxy Server Error:</h3><p>${err.message}</p>`);
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Proxy Node Network operating live on port ${PORT}`));
+app.listen(PORT, () => console.log(`Streaming Proxy operating live on port ${PORT}`));
