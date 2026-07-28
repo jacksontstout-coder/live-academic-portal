@@ -49,11 +49,9 @@ app.get('/', (req, res) => {
             </style>
         </head>
         <body>
-            <!-- Dynamic Hidden Web Proxy Frame Layer -->
             <div id="viewPanel" class="view-panel">
                 <iframe id="proxyIframe" src=""></iframe>
             </div>
-
             <div id="mainUI" class="app-container">
                 <div class="sidebar">
                     <div class="school-logo">CampusWorkspace</div>
@@ -83,18 +81,14 @@ app.get('/', (req, res) => {
                 document.getElementById('searchBtn').onclick = function() {
                     let target = document.getElementById('urlInput').value.trim();
                     if (!target) return;
-                    
                     if (!target.includes('.')) {
                         target = 'https://google.com' + encodeURIComponent(target);
                     } else if (!/^https?:\\/\\//i.test(target)) {
                         target = 'https://' + target;
                     }
-
-                    // FIXED: Loads the frame invisibly over the page. The browser URL stays completely frozen.
                     document.getElementById('viewPanel').style.display = 'block';
                     document.getElementById('proxyIframe').src = '/service?url=' + encodeURIComponent(target);
                 };
-
                 document.getElementById('cloneBtn').onclick = function() {
                     const div = document.getElementById('result-link');
                     div.style.display = "block";
@@ -152,7 +146,11 @@ app.get('/service', async (req, res) => {
         htmlContent = htmlContent.replace(/content-security-policy/gi, 'disabled-csp');
         htmlContent = htmlContent.replace(/x-frame-options/gi, 'disabled-xfo');
 
+        // CRITICAL PATCH: Overrides the browser same-origin checks to defeat ERR_BLOCKED_BY_RESPONSE
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+        
         res.send(htmlContent);
     } catch (err) {
         res.status(500).send(`<h3>Streaming Proxy Server Error:</h3><p>${err.message}</p>`);
