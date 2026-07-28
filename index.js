@@ -1,9 +1,14 @@
 const express = require('express');
+const http = require('http');
+const cors = require('cors');
+
 const app = express();
+const server = http.createServer(app);
 
-const modules = ['algebra-workbook', 'geometry-proofs', 'calculus-limits', 'history-archive', 'literature-notes'];
+// Allow unrestricted data streaming across our cloud proxy lanes
+app.use(cors());
 
-// Route to handle serving the interactive workspace hub layout
+// Serve the master interactive search interface on the home path
 app.get('/', (req, res) => {
     const activeAssignment = req.query.assignment || '';
     const activeSearch = req.query.q || '';
@@ -26,7 +31,7 @@ app.get('/', (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Student Workspace Portal - Academic Database</title>
             <style>
-                body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #1e293b; }
+                body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #1e293b; overflow: hidden; }
                 .app-container { display: flex; min-height: 100vh; width: 100%; }
                 .sidebar { width: 260px; background: #2c3e50; color: white; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; border-right: 1px solid rgba(255,255,255,0.1); }
                 .school-logo { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; padding-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px; }
@@ -43,15 +48,16 @@ app.get('/', (req, res) => {
                 .action-btn { display: block; padding: 14px 24px; font-size: 15px; background: #0070f3; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; box-sizing: border-box; text-align: center; }
                 .bot-btn { background: #1e293b; margin-top: 10px; }
                 #result-link { margin-top: 25px; padding: 15px; background: #f0f7ff; border: 1px solid #bae7ff; border-radius: 8px; display: none; word-break: break-all; font-size: 14px; }
-                .view-panel { display: ${activeSearch ? 'block' : 'none'}; padding: 40px; background: white; min-height: 100vh; box-sizing: border-box; width: 100%; position: fixed; top: 0; left: 0; z-index: 1000; overflow-y: auto; }
+                .view-panel { display: ${activeSearch ? 'block' : 'none'}; width: 100%; height: 100%; border: none; box-sizing: border-box; position: fixed; top: 0; left: 0; z-index: 1000; background: #fff; }
+                iframe { width: 100%; height: 100%; border: none; margin: 0; padding: 0; }
             </style>
         </head>
         <body>
+            <!-- Dynamic Web Proxy Frame Layer -->
             <div id="viewPanel" class="view-panel">
-                <h1 id="outputTitle" style="font-size:28px; border-bottom:2px solid #e2e8f0; padding-bottom:10px; color:#2c3e50;">Loading Resource Document...</h1>
-                <div id="outputContent" style="font-size:16px; line-height:1.7; color:#334155; margin-top:20px;"></div>
-                <button onclick="window.location.search=''" class="action-btn" style="background:#64748b; margin-top:30px; width:auto; display:inline-block;">Return to Core Hub</button>
+                <iframe src="/service/${encodeURIComponent(activeSearch)}"></iframe>
             </div>
+
             <div id="mainUI" class="app-container">
                 <div class="sidebar">
                     <div class="school-logo">CampusWorkspace</div>
@@ -66,8 +72,8 @@ app.get('/', (req, res) => {
                     </div>
                     <div class="tool-box">
                         <h3>External Research Engine Tunnel</h3>
-                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Type a resource keyword below to extract unblocked data packs straight within this portal tab context.</p>
-                        <input type="text" id="urlInput" placeholder="Enter topic reference here (e.g., space, physics)..." autocomplete="off">
+                        <p style="color:#64748b; font-size:14px; margin-bottom:20px;">Type any URL or website destination below to launch an unblocked proxy mirror inside this tab container workspace.</p>
+                        <input type="text" id="urlInput" placeholder="Enter any site URL here (e.g., wikipedia.org, google.com)..." autocomplete="off">
                         <button class="action-btn" id="searchBtn">Execute Research Pipeline</button>
                     </div>
                     <div class="tool-box">
@@ -78,30 +84,16 @@ app.get('/', (req, res) => {
                 </div>
             </div>
             <script>
-                const searchVal = "${encodeURIComponent(activeSearch)}";
-                if (searchVal) {
-                    // FIX: Directs backend endpoint mapping request straight through your own web service origin
-                    fetch('/api/fetch?q=' + searchVal)
-                        .then(res => res.json())
-                        .then(data => {
-                            if (data.error) {
-                                document.getElementById('outputTitle').innerText = "Data Search Result";
-                                document.getElementById('outputContent').innerText = data.text;
-                            } else {
-                                document.getElementById('outputTitle').innerText = data.title;
-                                document.getElementById('outputContent').innerHTML = "<p>" + data.text.replace(/\\n/g, "</p><p>") + "</p>";
-                            }
-                        }).catch(err => {
-                            document.getElementById('outputTitle').innerText = "Tracing Error";
-                            document.getElementById('outputContent').innerText = err.message;
-                        });
-                }
-
                 document.getElementById('searchBtn').onclick = function() {
                     let target = document.getElementById('urlInput').value.trim();
                     if (!target) return;
-                    if (!target.includes('.')) target = 'https://google.com' + encodeURIComponent(target);
-                    else if (!/^https?:\\/\\//i.test(target)) target = 'https://' + target;
+                    
+                    // Formulate standard search indexing paths for plain text keywords vs domains
+                    if (!target.includes('.')) {
+                        target = 'https://google.com' + encodeURIComponent(target);
+                    } else if (!/^https?:\\/\\//i.test(target)) {
+                        target = 'https://' + target;
+                    }
 
                     const subs = ['algebra-workbook', 'geometry-proofs', 'calculus-limits', 'history-archive'];
                     const randomSubject = subs[Math.floor(Math.random() * subs.length)] + '-' + Math.floor(1000 + Math.random() * 9999);
@@ -122,27 +114,42 @@ app.get('/', (req, res) => {
     `);
 });
 
-// FIX: Backend server-side fetch handler resolves all cross-origin site security blockages
-app.get('/api/fetch', async (req, res) => {
-    const rawQuery = decodeURIComponent(req.query.q || '');
-    const cleanQuery = rawQuery.split("://").pop().split("www.").pop().split(".")[0];
-    const endpoint = `https://wikipedia.org{encodeURIComponent(cleanQuery)}&origin=*`;
-    
+// TRUE BACKEND RE-ROUTING GATEWAY (Intercerts and streams the ENTIRE live internet natively)
+app.get('/service/:url', async (req, res) => {
+    let targetUrl = decodeURIComponent(req.params.url);
+    if (!targetUrl) return res.status(400).send("No target site URL specified.");
+
     try {
-        const response = await fetch(endpoint);
-        const data = await response.json();
-        const pages = data.query.pages;
-        const id = Object.keys(pages)[0];
+        const urlObj = new URL(targetUrl);
         
-        if (id !== "-1") {
-            res.json({ title: pages[id].title, text: pages[id].extract });
-        } else {
-            res.json({ error: true, text: "Unblocked data layer processed for token query: " + rawQuery });
-        }
+        // Formulate standard headers array to spoof target site filters
+        const options = {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5'
+            }
+        };
+
+        // Fetch the raw internet asset data directly on the server-side to neutralize client-side firewalls
+        const response = await fetch(targetUrl, options);
+        let htmlContent = await response.text();
+
+        // DEFEAT SAME-ORIGIN SECURITY: Inject an internal base path tag so the site fetches assets from itself
+        const injectionBase = `<head><base href="${urlObj.origin}/">`;
+        htmlContent = htmlContent.replace(/<head>/i, injectionBase);
+
+        // Strip content validation script tags that cause layout breaking or tracking
+        htmlContent = htmlContent.replace(/content-security-policy/gi, 'disabled-csp');
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(htmlContent);
+
     } catch (err) {
-        res.status(500).json({ error: true, text: "Server Pipeline Exception: " + err.message });
+        res.status(500).send(`<h3>Proxy Server Connection Timeout:</h3><p>${err.message}</p>`);
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server executing live on port ${PORT}`));
+app.listen(PORT, () => console.log(`Proxy Node Network operating live on port ${PORT}`));
